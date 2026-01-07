@@ -1,0 +1,5 @@
+{
+  "name": "AI Media Assistant",
+  "description": "An intelligent tool to analyze videos and articles via URL. Generates data-rich summaries, extracts transcripts, and summarizes community comments for corrections and insights.",
+  "requestFramePermissions": []
+}
