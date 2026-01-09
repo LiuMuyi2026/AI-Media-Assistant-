@@ -5,9 +5,18 @@ import { AnalysisRequest, AnalysisResult, ScriptRequest, ScriptResult, ImageGene
 const cleanText = (text: string) => text.trim();
 
 const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
+  // Try standard process.env.API_KEY first. 
+  // If missing, check common client-side prefixes (NEXT_PUBLIC_, VITE_, REACT_APP_) 
+  // which are often required by hosting providers like Vercel for client-side exposure.
+  // Also checks for GOOGLE_GENERATIVE_AI_API_KEY as requested.
+  const apiKey = process.env.API_KEY || 
+                 process.env.NEXT_PUBLIC_API_KEY || 
+                 process.env.VITE_API_KEY || 
+                 process.env.REACT_APP_API_KEY ||
+                 process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+
   if (!apiKey) {
-    throw new Error("API_KEY is missing from environment variables.");
+    throw new Error("API_KEY is missing. Please ensure your environment variable is set (e.g., NEXT_PUBLIC_API_KEY, VITE_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY).");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -34,18 +43,21 @@ export const analyzeMedia = async (request: AnalysisRequest): Promise<AnalysisRe
     required: ["summary", "originalContent"],
   };
 
+  // Improved prompt to strictly force the model to search for the specific URL
   const prompt = `
-    You are an expert AI Media Assistant. Your task is to analyze the content at the provided URL.
+    You are an expert AI Media Assistant. 
     
-    Target URL: ${request.url}
+    CORE TASK: Analyze the content found SPECIFICALLY at this URL: ${request.url}
     
     Configuration:
     1. Output Language: ${request.language}
     2. Summary Detail Level: ${request.conciseness}
     3. Analyze Comments: ${request.includeComments ? "YES" : "NO"}
 
-    Instructions:
-    1. Use the Google Search tool to find the FULL content of the URL.
+    STRICT INSTRUCTIONS:
+    1. **Search Query**: Use the Google Search tool. Your search query MUST be the exact URL provided above ("${request.url}"). 
+       - DO NOT search for the topic or keywords inferred from the URL. 
+       - Search for the specific link to retrieve its specific content/transcript.
     2. **Summary**: Generate a structured summary based on the 'Detail Level'. 
        - **Word Count Targets**:
          * Brief: ~500 words.
@@ -59,7 +71,7 @@ export const analyzeMedia = async (request: AnalysisRequest): Promise<AnalysisRe
        - **DO NOT PARAPHRASE**.
        - If it is a video, provide the complete spoken transcript.
        - If it is an article, provide the full body text.
-    4. **Comments**: If 'Analyze Comments' is YES, look for user comments or discussions related to this content.
+    4. **Comments**: If 'Analyze Comments' is YES, look for user comments or discussions related to this SPECIFIC content/URL.
        - Focus specifically on comments that CORRECT errors in the original content.
        - Highlight "brilliant" or highly upvoted insights.
        - If 'Analyze Comments' is NO, leave this field empty or "N/A".
