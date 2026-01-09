@@ -4,21 +4,34 @@ import { AnalysisRequest, AnalysisResult, ScriptRequest, ScriptResult, ImageGene
 // Helper to sanitize the result
 const cleanText = (text: string) => text.trim();
 
-// Helper to safely access environment variables in various environments (Vite, Next.js, CRA, Node)
-const getEnvVar = (key: string): string | undefined => {
-  // Check import.meta.env (Standard in Vite)
+// Helper to get API Key safely across different build tools (Vite, Next.js, Webpack)
+// We access properties explicitly (e.g. import.meta.env.VITE_API_KEY) instead of dynamically (import.meta.env[key])
+// because many bundlers (like Vite) use static replacement and do not support dynamic key access.
+const getApiKey = (): string | undefined => {
+  // 1. Check import.meta.env (Vite standard)
   try {
     // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
       // @ts-ignore
-      return import.meta.env[key];
+      if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+      // @ts-ignore
+      if (import.meta.env.NEXT_PUBLIC_API_KEY) return import.meta.env.NEXT_PUBLIC_API_KEY;
+      // @ts-ignore
+      if (import.meta.env.GOOGLE_GENERATIVE_AI_API_KEY) return import.meta.env.GOOGLE_GENERATIVE_AI_API_KEY;
     }
   } catch (e) { /* ignore */ }
 
-  // Check process.env (Standard in Webpack, Next.js, CRA, Node)
+  // 2. Check process.env (Next.js, Create React App, Node)
   try {
-    if (typeof process !== 'undefined' && process.env && process.env[key]) {
-      return process.env[key];
+    if (typeof process !== 'undefined' && process.env) {
+      // Standard Next.js / Node
+      if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) return process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+      if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
+      if (process.env.API_KEY) return process.env.API_KEY;
+      
+      // Legacy / CRA / Vite comp
+      if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
+      if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
     }
   } catch (e) { /* ignore */ }
 
@@ -26,15 +39,10 @@ const getEnvVar = (key: string): string | undefined => {
 };
 
 const getAIClient = () => {
-  // Check all common naming conventions and prefixes
-  const apiKey = getEnvVar("API_KEY") || 
-                 getEnvVar("NEXT_PUBLIC_API_KEY") || 
-                 getEnvVar("VITE_API_KEY") || 
-                 getEnvVar("REACT_APP_API_KEY") ||
-                 getEnvVar("GOOGLE_GENERATIVE_AI_API_KEY");
+  const apiKey = getApiKey();
 
   if (!apiKey) {
-    throw new Error("API_KEY is missing. Please check your .env file or Vercel environment variables. Ensure the key is named VITE_API_KEY, NEXT_PUBLIC_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY.");
+    throw new Error("API_KEY is missing. Please check your .env file or deployment settings. Supported variable names: VITE_API_KEY, NEXT_PUBLIC_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY.");
   }
   return new GoogleGenAI({ apiKey });
 };
