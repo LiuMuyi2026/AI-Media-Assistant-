@@ -4,19 +4,37 @@ import { AnalysisRequest, AnalysisResult, ScriptRequest, ScriptResult, ImageGene
 // Helper to sanitize the result
 const cleanText = (text: string) => text.trim();
 
+// Helper to safely access environment variables in various environments (Vite, Next.js, CRA, Node)
+const getEnvVar = (key: string): string | undefined => {
+  // Check import.meta.env (Standard in Vite)
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+      // @ts-ignore
+      return import.meta.env[key];
+    }
+  } catch (e) { /* ignore */ }
+
+  // Check process.env (Standard in Webpack, Next.js, CRA, Node)
+  try {
+    if (typeof process !== 'undefined' && process.env && process.env[key]) {
+      return process.env[key];
+    }
+  } catch (e) { /* ignore */ }
+
+  return undefined;
+};
+
 const getAIClient = () => {
-  // Try standard process.env.API_KEY first. 
-  // If missing, check common client-side prefixes (NEXT_PUBLIC_, VITE_, REACT_APP_) 
-  // which are often required by hosting providers like Vercel for client-side exposure.
-  // Also checks for GOOGLE_GENERATIVE_AI_API_KEY as requested.
-  const apiKey = process.env.API_KEY || 
-                 process.env.NEXT_PUBLIC_API_KEY || 
-                 process.env.VITE_API_KEY || 
-                 process.env.REACT_APP_API_KEY ||
-                 process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  // Check all common naming conventions and prefixes
+  const apiKey = getEnvVar("API_KEY") || 
+                 getEnvVar("NEXT_PUBLIC_API_KEY") || 
+                 getEnvVar("VITE_API_KEY") || 
+                 getEnvVar("REACT_APP_API_KEY") ||
+                 getEnvVar("GOOGLE_GENERATIVE_AI_API_KEY");
 
   if (!apiKey) {
-    throw new Error("API_KEY is missing. Please ensure your environment variable is set (e.g., NEXT_PUBLIC_API_KEY, VITE_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY).");
+    throw new Error("API_KEY is missing. Please check your .env file or Vercel environment variables. Ensure the key is named VITE_API_KEY, NEXT_PUBLIC_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY.");
   }
   return new GoogleGenAI({ apiKey });
 };
